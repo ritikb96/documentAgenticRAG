@@ -7,8 +7,8 @@ An advanced agent-based Retrieval-Augmented Generation (RAG) system designed to 
 ## ⚙️ Tech Stack Overview
 
 - **API Framework**: FastAPI
-- **Document Parsing**: [`docling`](https://github.com/langchain-ai/docling)
-- **LLM**: OpenAI `gpt-4-omni`
+- **Document Parsing**: [`docling`][https://github.com/langchain-ai/docling](https://github.com/docling-project/docling)
+- **LLM**: OpenAI `gpt-4-mini`
 - **Embedding Model**: `text-embedding-3-small`
 - **Chunking Strategy**: Custom chunking based on semantic overlap and cosine similarity
 - **Vector Store**: Qdrant
