@@ -59,7 +59,8 @@ Follow the steps below to set up and run all components:
 
 ```bash
 git clone https://github.com/ritikb96/documentAgenticRAG.git
-cd documentAgenticRAG
+cd documentAgenticRAG ```
+
 
 ---
 
