@@ -59,7 +59,44 @@ Follow the steps below to set up and run all components:
 
 ```bash
 git clone https://github.com/ritikb96/documentAgenticRAG.git
-cd documentAgenticRAG ```
+cd documentAgenticRAG
+```
+
+### 2. Install Python Dependencies
+```bash
+pip install -r requirements.txt
+
+```
+
+### 3. Start Qdrant (Vector DB)
+```bash
+docker pull qdrant/qdrant
+
+docker run -p 6333:6333 -p 6334:6334 \
+    -v "$(pwd)/qdrant_storage:/qdrant/storage:z" \
+    qdrant/qdrant
+
+```
+
+### 4. Start RedisInsight (Optional: For Memory Monitoring)
+```
+docker run -d --name redisinsight -p 5540:5540 \
+    redis/redisinsight:latest -v redisinsight:/data
+
+```
+
+
+### 🚀 FastAPI Endpoints
+
+The backend exposes two main FastAPI endpoints:
+
+- **`/upload/`** – Accepts `.pdf` or `.txt` files for processing.  
+  It extracts text using **Docling**, chunks it with a custom semantic strategy, embeds using `text-embedding-3-small`, and stores results in **Qdrant** (vectors) and **Supabase** (metadata).
+
+- **`/chat/`** – Handles user queries via a **LangGraph** agent.  
+  The agent intelligently routes queries through tools like **RAG lookup**, **web search**, or **interview booking**, depending on intent. It uses **GPT-4o** as the LLM and **Redis** for maintaining conversational memory.
+
+These endpoints work together to enable a full agentic RAG pipeline on uploaded documents.
 
 
 ---
