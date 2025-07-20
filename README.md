@@ -53,7 +53,13 @@ Users can book interviews through the conversational agent. The agent gathers de
 
 ## 🚀 Getting Started
 
-Coming soon: setup instructions, API endpoints, and deployment notes.
+Follow the steps below to set up and run all components:
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/ritikb96/documentAgenticRAG.git
+cd documentAgenticRAG
 
 ---
 
