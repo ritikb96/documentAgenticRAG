@@ -24,10 +24,9 @@ retriever = None
 tavily = None
 
 @tool
-def rag_search_tool(query: str) -> str:
+def rag_search_tool(query: str) -> list:
     """Search Qdrant-based knowledge base for relevant chunks."""
-    results = retriever.invoke(query)
-    return "\n".join(doc.page_content for doc in results)
+    return retriever.invoke(query)
 
 @tool
 def web_search_tool(query: str) -> str:
@@ -42,7 +41,7 @@ class AgentState(TypedDict):
     web: Optional[str]
 
 class RouteDecision(BaseModel):
-    route: Literal["rag", "answer", "end","interview"]
+    route: Literal["rag", "answer","web","end","interview"]
     reply: Optional[str] = None
 
 class RagJudge(BaseModel):
@@ -89,13 +88,17 @@ class DocuRAGAgent:
     def _router_node(self, state: AgentState) -> AgentState:
         q = state["messages"][-1].content
         decision: RouteDecision = self.llm_router.invoke([
-            SystemMessage(content="You are a routing agent. Prefer using RAG to check the knowledge base first.\
-                          Use 'answer' if the question is general, creative, or involves personal information like 'my name is' or 'remember'.\
-                          Use 'end' only if the user explicitly says goodbye, wants to finish, or indicates the conversation is over.\
-                         Do not route to 'end' for casual statements or new information from the user.\
-                         Use 'interview' if the user query includes subject about interview,book interview " ),
+            SystemMessage(content="You are a routing agent. For all questions seeking factual, knowledge-based answers \
+            (e.g., 'Where did x live?','What is X?') Route to 'rag'.  \
+            If the path provides sufficient information to respond directly to the user, or chit-chat route to 'answer'.  \
+            For interview booking, route to 'interview'. Route to 'end' only if the  \
+            Use 'web' if the question is about current events, latest news, trending topics, or things  \
+            that may have changed recently (like today's weather, or latest election news).\
+            user says goodbye or wants to end." ),
             HumanMessage(content=q)
         ])
+
+        print(f"Router decision: {decision.route}")
         new_state = {**state, "route": decision.route}
         if decision.route == "end":
             new_state["messages"].append(AIMessage(content=decision.reply or "Goodbye!"))
@@ -103,10 +106,27 @@ class DocuRAGAgent:
 
     def _rag_node(self, state: AgentState) -> AgentState:
         q = state["messages"][-1].content
-        chunks = rag_search_tool.invoke({"query": q})
-        prompt = f"Question: {q}\nDocs: {chunks[:300]}\u2026"
+        
+        # Get list of Document objects
+        docs = rag_search_tool.invoke({"query": q})
+        
+        # Extract content from top 3 documents
+        context = "\n\n".join(doc.page_content for doc in docs[:3])
+        print(f"🔍 Retrieved: {[doc.page_content for doc in docs]}")
+
+
+        
+        # Build prompt using the extracted context
+        prompt = f"Question: {q}\n\nContext:\n{context}"
+        
+        # Let the judge decide if context is sufficient
         verdict: RagJudge = self.llm_judge.invoke([HumanMessage(content=prompt)])
-        return {**state, "rag": chunks, "route": "answer" if verdict.sufficient else "web"}
+        
+        return {
+            **state,
+            "rag": docs,  # Store full document list in state
+            "route": "answer" if verdict.sufficient else "web"
+        }
 
     def _web_node(self, state: AgentState) -> AgentState:
         q = state["messages"][-1].content
@@ -151,7 +171,7 @@ class DocuRAGAgent:
         # 4. Always store the full Q&A pair as memory
         combined_memory = f"User: {user_query}\nAssistant: {final_answer.content}"
         self.redis_store.put(namespace, str(uuid.uuid4()), {"data": combined_memory})
-
+        
         return {
             **state,
             "messages": state["messages"] + [final_answer],
@@ -224,9 +244,11 @@ class DocuRAGAgent:
         # Routing logic: Always ends in "answer"
         agent_graph.add_conditional_edges("router", self.from_router, {
             "rag": "rag_lookup",
-            "answer": "answer",   
-            "end": "answer",     
-            "interview":"book_interview"
+            "answer": "answer",    
+            "interview":"book_interview",
+            "web":"web_search",
+            "end":"answer"
+
         })
 
         # After rag lookup: go to web or answer
